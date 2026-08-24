@@ -1,0 +1,59 @@
+# Replace the host execution world with one AgentENV sandbox. The generic Bash,
+# file, terminal, and LSP consumers remain unchanged above these providers.
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+  disabled: true
+
+- id: sandbox
+  name: '@deepseek-ai/dsh-sandbox-local'
+  disabled: true
+
+- id: bash-sandbox
+  name: '@deepseek-ai/dsh-bash-sandbox'
+  disabled: true
+
+- id: fs-sandbox
+  name: '@deepseek-ai/dsh-fs-sandbox'
+  disabled: true
+
+# Harness confined modes currently resolve host paths and cannot truthfully
+# enforce a remote workspace. Full access here is scoped to the microVM.
+- id: sandbox-policy
+  name: '@deepseek-ai/dsh-sandbox-policy'
+  config:
+    mode: danger-full-access
+    workspaceRoot: !!js process.cwd()
+
+- id: approval
+  name: '@deepseek-ai/dsh-user-approval'
+  config:
+    policy: never
+
+- insert:
+    - id: agentenv-runtime
+      name: dsh-agentenv-sandbox
+      config:
+        apiUrl: !!js process.env.E2B_API_URL ?? 'http://127.0.0.1:8000'
+        sandboxUrl: !!js process.env.E2B_SANDBOX_URL ?? process.env.E2B_API_URL ?? 'http://127.0.0.1:8000'
+        template: !!js process.env.AENV_TEMPLATE_ID
+        cwd: !!js process.cwd()
+        localCwd: !!js process.cwd()
+        timeoutMs: 3600000
+        secure: true
+        onDispose: kill
+        uploadWorkspace: true
+        symlinkPolicy: error
+
+    - id: subprocess-agentenv
+      name: '@deepseek-ai/dsh-subprocess-e2b'
+
+    - id: fs-agentenv
+      name: '@deepseek-ai/dsh-fs-e2b'
+
+    # Despite its historical name, this executor delegates every process to the
+    # mounted ctx.subprocess provider and therefore runs inside AgentENV.
+    - id: bash-agentenv
+      name: '@deepseek-ai/dsh-bash-local'
+      config:
+        timeoutMs: 60000
+
