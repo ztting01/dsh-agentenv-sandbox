@@ -128,6 +128,41 @@ cd /absolute/path/to/project
 dsh --profile web
 ```
 
+#### Required workspace-path invariant
+
+The workspace selected for the conversation in the Web client **must have exactly the same absolute path** as the directory from which the DSH process was started:
+
+```text
+DSH process.cwd()
+  = Web client conversation workspace path
+  = AgentENV sandbox cwd
+```
+
+The workspace display name is irrelevant; the absolute path is what must match. For example, after starting DSH with:
+
+```bash
+cd /home/user/project-a
+dsh --profile web
+```
+
+select `/home/user/project-a` as the conversation workspace in the Web client and then create or open a conversation belonging to that workspace. Do not select `/home/user/project-b`, even if both workspaces are visible in the sidebar. Restarting DSH does not delete saved conversations or change the workspace recorded by an existing conversation.
+
+This MVP owns one sandbox and one fixed cwd per DSH process. Switching the Web client to a different workspace does not recreate the sandbox or upload the newly selected directory. A mismatch commonly fails with an error such as:
+
+```text
+Error: [invalid_argument] cwd '/different/workspace' does not exist
+```
+
+To use several workspaces concurrently, start one DSH process per workspace on a different Web port, and use the matching workspace in each client page:
+
+```bash
+cd /home/user/project-a
+dsh --profile web --port 3080 --no-open
+
+cd /home/user/project-b
+dsh --profile web --port 3081 --no-open
+```
+
 The default configuration uploads the project, including `.git`, to the same absolute POSIX path inside a fresh microVM. It excludes `node_modules`, Python virtual environments, caches, and `.dsh-agentenv`. Symbolic links to files or directories inside the workspace are uploaded as regular copies. Links that are dangling, point outside the workspace, create directory cycles, resolve to unsupported file types, or target excluded paths abort startup. Set `symlinkPolicy: error` for strict rejection or `skip` only when omission is intentional.
 
 After a successful initial upload, the plugin writes a non-secret completion summary to `.dsh-e2b/workspace-upload.json` inside the microVM. Its presence means the bounded scan and every upload batch completed; it is also useful for startup diagnostics.
@@ -174,6 +209,7 @@ The script reads the existing `aenv auth` credential file inside the process, ne
 
 ## Known limitations
 
+- One DSH process owns one AgentENV sandbox with one fixed cwd. Web-client workspace switching is unsupported unless the selected workspace path is identical to the directory from which DSH was started.
 - No automatic sandbox discovery, reconnect retry, snapshot UI, or incremental synchronization.
 - No automatic download or merge of remote changes into the host workspace.
 - Symbolic links cannot be reproduced by the E2B filesystem API used by this MVP.
