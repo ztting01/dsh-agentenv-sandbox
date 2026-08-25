@@ -36,7 +36,21 @@ export AENV_TEMPLATE_ID='<template-id-or-alias>'
 
 ## Install
 
-Build once, then add the local bundle to a Harness profile:
+Download the release tarball and add it to a Harness profile:
+
+```bash
+curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.1/dsh-agentenv-sandbox-0.1.1.tgz
+dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.1.tgz"
+dsh --profile web --dump-config
+```
+
+If you run Harness from a source checkout instead of an installed `dsh` command, replace `dsh` with:
+
+```bash
+/path/to/node /path/to/deepseek-harness/apps/cli/lib/bin.js
+```
+
+For plugin development, build once and install the local directory instead:
 
 ```bash
 npm install
@@ -79,7 +93,7 @@ To preserve a sandbox across Harness restarts, set `onDispose: pause`, then star
 
 ## Security model
 
-Harness reports `danger-full-access` because its current confined modes resolve host paths and do not enforce remote filesystem paths. The access is full only inside the AgentENV microVM; the host workspace is not mounted. The API key stays in the host SDK connection and is not inserted into sandbox command environments by this plugin.
+Harness reports `danger-full-access` because its current confined modes resolve host paths and do not enforce remote filesystem paths. The access is full only inside the AgentENV microVM; the host workspace is not mounted. The bundle disables `permission-presets` because that service requires a host-confined Bash executor with a mutable `sandboxMode`; AgentENV is instead a fixed isolation boundary. The approval policy remains `never`, and the Web permission selector is intentionally unavailable. The API key stays in the host SDK connection and is not inserted into sandbox command environments by this plugin.
 
 The initial upload is an explicit control-plane exception: the plugin reads the selected host workspace once and sends bounded regular-file content to AgentENV. After setup, model-facing file and process operations use the remote providers. There is no automatic write-back to the host.
 

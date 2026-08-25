@@ -29,6 +29,13 @@
   config:
     policy: never
 
+# Permission presets require a host-confined Bash executor with a mutable
+# sandboxMode. AgentENV is the fixed isolation boundary, so that selector is
+# intentionally unavailable instead of advertising modes it cannot enforce.
+- id: permission
+  name: '@deepseek-ai/dsh-permission-presets'
+  disabled: true
+
 - insert:
     - id: agentenv-runtime
       name: dsh-agentenv-sandbox
@@ -56,4 +63,3 @@
       name: '@deepseek-ai/dsh-bash-local'
       config:
         timeoutMs: 60000
-
