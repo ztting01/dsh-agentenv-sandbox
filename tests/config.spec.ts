@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import AgentEnvRuntime from '../src/index.js'
 import { resolveConfig } from '../src/config.js'
 
 describe('resolveConfig', () => {
@@ -57,5 +58,17 @@ describe('resolveConfig', () => {
     expect(resolved.apiKey).toBe('explicit-key')
     expect(resolved.uploadWorkspace).toBe(false)
     expect(JSON.stringify({ ...resolved, apiKey: undefined })).not.toContain('explicit-key')
+  })
+
+  it('preserves upload exclusions after Cordis schema parsing', () => {
+    const parsed = AgentEnvRuntime.Config({
+      apiKey: 'test-key',
+      template: 'ubuntu-dev',
+    })
+    const resolved = resolveConfig(parsed, {}, '/workspace')
+
+    expect(parsed.uploadExcludes).toBeUndefined()
+    expect(resolved.uploadExcludes).toContain('node_modules')
+    expect(resolved.uploadExcludes).toContain('.cache')
   })
 })

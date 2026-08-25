@@ -1,6 +1,6 @@
 {
   "name": "dsh-agentenv-sandbox",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "AgentENV execution-world bundle for DeepSeek Harness",
   "homepage": "https://github.com/ztting01/dsh-agentenv-sandbox#readme",
   "bugs": {

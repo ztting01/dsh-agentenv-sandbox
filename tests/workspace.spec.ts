@@ -83,6 +83,45 @@ describe('uploadWorkspace', () => {
     expect(Buffer.from(copied!.data).toString()).toBe('target')
   })
 
+  it('copies an internal directory symbolic link and its files', async () => {
+    const root = await fixtureRoot()
+    await mkdir(posix.join(root, 'skills'))
+    await mkdir(posix.join(root, '.claude'))
+    await writeFile(posix.join(root, 'skills', 'one.md'), 'skill')
+    await symlink('../skills', posix.join(root, '.claude', 'skills'))
+    const write = vi.fn().mockResolvedValue(undefined)
+    const config = resolveConfig({ template: 'ubuntu-dev', localCwd: root }, {
+      E2B_API_KEY: 'test-key',
+    }, '/remote/project')
+
+    await expect(uploadWorkspace(mockSandbox(write), config)).resolves.toEqual({
+      files: 2,
+      bytes: 10,
+      copiedSymlinks: 1,
+      skippedSymlinks: 0,
+    })
+    const uploaded = write.mock.calls.flatMap(call => call[0] as Array<{ path: string }>)
+    expect(uploaded.map(entry => entry.path).sort()).toEqual([
+      '/remote/project/.claude/skills/one.md',
+      '/remote/project/skills/one.md',
+    ])
+  })
+
+  it('rejects directory symlink cycles', async () => {
+    const root = await fixtureRoot()
+    await mkdir(posix.join(root, 'dir'))
+    await symlink('..', posix.join(root, 'dir', 'loop'))
+    const write = vi.fn().mockResolvedValue(undefined)
+    const config = resolveConfig({ template: 'ubuntu-dev', localCwd: root }, {
+      E2B_API_KEY: 'test-key',
+    }, '/remote/project')
+
+    await expect(uploadWorkspace(mockSandbox(write), config)).rejects.toThrow(
+      'symbolic link creates directory cycle: dir/loop',
+    )
+    expect(write).not.toHaveBeenCalled()
+  })
+
   it('still supports fail-closed symbolic-link handling', async () => {
     const root = await fixtureRoot()
     await writeFile(posix.join(root, 'target.txt'), 'target')

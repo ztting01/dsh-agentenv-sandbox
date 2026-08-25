@@ -154,7 +154,7 @@ export function resolveConfig(
     uploadExcludes: [...uploadExcludes],
     uploadMaxFiles: requirePositiveInteger(config.uploadMaxFiles ?? 50_000, 'uploadMaxFiles'),
     uploadMaxBytes: requirePositiveInteger(config.uploadMaxBytes ?? 536_870_912, 'uploadMaxBytes'),
-    uploadMaxFileBytes: requirePositiveInteger(config.uploadMaxFileBytes ?? 67_108_864, 'uploadMaxFileBytes'),
+    uploadMaxFileBytes: requirePositiveInteger(config.uploadMaxFileBytes ?? 268_435_456, 'uploadMaxFileBytes'),
     symlinkPolicy: config.symlinkPolicy ?? 'copy-internal',
   }
 }

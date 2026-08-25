@@ -39,8 +39,8 @@ export AENV_TEMPLATE_ID='<template-id-or-alias>'
 Download the release tarball and add it to a Harness profile:
 
 ```bash
-curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.2/dsh-agentenv-sandbox-0.1.2.tgz
-dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.2.tgz"
+curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.3/dsh-agentenv-sandbox-0.1.3.tgz
+dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.3.tgz"
 dsh --profile web --dump-config
 ```
 
@@ -66,7 +66,9 @@ cd /absolute/path/to/project
 dsh --profile web
 ```
 
-The default configuration uploads the project, including `.git`, to the same absolute POSIX path inside a fresh microVM. It excludes `node_modules`, Python virtual environments, caches, and `.dsh-agentenv`. A symbolic link to a regular file inside the workspace is uploaded as a regular-file copy. Links that are dangling, point outside the workspace, resolve to directories, or target excluded paths abort startup. Set `symlinkPolicy: error` for strict rejection or `skip` only when omission is intentional.
+The default configuration uploads the project, including `.git`, to the same absolute POSIX path inside a fresh microVM. It excludes `node_modules`, Python virtual environments, caches, and `.dsh-agentenv`. Symbolic links to files or directories inside the workspace are uploaded as regular copies. Links that are dangling, point outside the workspace, create directory cycles, resolve to unsupported file types, or target excluded paths abort startup. Set `symlinkPolicy: error` for strict rejection or `skip` only when omission is intentional.
+
+After a successful initial upload, the plugin writes a non-secret completion summary to `.dsh-e2b/workspace-upload.json` inside the microVM. Its presence means the bounded scan and every upload batch completed; it is also useful for startup diagnostics.
 
 ## Configuration
 
@@ -86,8 +88,8 @@ Override the `agentenv-runtime` row in the profile's `cordis.patch.yml`. A later
 | `uploadWorkspace` | `true` | Initial bounded host-to-sandbox upload |
 | `uploadMaxFiles` | `50000` | Upload file-count bound |
 | `uploadMaxBytes` | `512 MiB` | Aggregate upload bound |
-| `uploadMaxFileBytes` | `64 MiB` | Per-file upload bound |
-| `symlinkPolicy` | `copy-internal` | Copy safe internal file links, or use `error`/`skip` |
+| `uploadMaxFileBytes` | `256 MiB` | Per-file upload bound |
+| `symlinkPolicy` | `copy-internal` | Copy safe internal file/directory links, or use `error`/`skip` |
 
 To preserve a sandbox across Harness restarts, set `onDispose: pause`, then start with the recorded `sandboxId`. Automatic discovery and host write-back are intentionally not part of this MVP.
 

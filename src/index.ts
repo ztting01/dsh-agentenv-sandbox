@@ -49,7 +49,9 @@ export class AgentEnvRuntime extends Service {
     onDispose: z.union(['kill', 'pause'] as const),
     uploadWorkspace: z.boolean(),
     localCwd: z.string(),
-    uploadExcludes: z.array(z.string()),
+    // Schemastery arrays otherwise materialize missing values as [], which
+    // would silently disable resolveConfig's dependency/cache exclusions.
+    uploadExcludes: z.array(z.string()).default(undefined as unknown as string[]),
     uploadMaxFiles: z.number(),
     uploadMaxBytes: z.number(),
     uploadMaxFileBytes: z.number(),
@@ -137,7 +139,11 @@ export class AgentEnvRuntime extends Service {
         { envs: controlEnvs() },
       )
       if (this.config.uploadWorkspace) {
-        await uploadWorkspace(sandbox, this.config)
+        const summary = await uploadWorkspace(sandbox, this.config)
+        await sandbox.files.write(
+          posix.join(this.runtimeRoot, 'workspace-upload.json'),
+          `${JSON.stringify({ schemaVersion: 1, ...summary })}\n`,
+        )
       }
       return sandbox
     } catch (error: unknown) {

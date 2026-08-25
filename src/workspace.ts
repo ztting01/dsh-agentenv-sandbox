@@ -39,6 +39,11 @@ async function collectEntries(config: ResolvedConfig): Promise<{
   let copiedSymlinks = 0
   let skippedSymlinks = 0
   const workspaceRoot = await realpath(config.localCwd)
+  const workspacePrefix = workspaceRoot.endsWith('/') ? workspaceRoot : `${workspaceRoot}/`
+
+  function staysInWorkspace(path: string): boolean {
+    return path === workspaceRoot || path.startsWith(workspacePrefix)
+  }
 
   function addFile(localPath: string, remotePath: string, relativePath: string, size: number): void {
     if (size > config.uploadMaxFileBytes) {
@@ -54,7 +59,20 @@ async function collectEntries(config: ResolvedConfig): Promise<{
     }
   }
 
-  async function visit(localDirectory: string, relativeDirectory: string): Promise<void> {
+  async function visit(
+    localDirectory: string,
+    relativeDirectory: string,
+    ancestorDirectories: ReadonlySet<string>,
+  ): Promise<void> {
+    const canonicalDirectory = await realpath(localDirectory)
+    if (!staysInWorkspace(canonicalDirectory)) {
+      throw new Error(`dsh-agentenv-sandbox: directory leaves workspace: ${relativeDirectory || '.'}`)
+    }
+    if (ancestorDirectories.has(canonicalDirectory)) {
+      throw new Error(`dsh-agentenv-sandbox: symbolic link creates directory cycle: ${relativeDirectory}`)
+    }
+    const nextAncestors = new Set(ancestorDirectories)
+    nextAncestors.add(canonicalDirectory)
     const directory = await opendir(localDirectory)
     for await (const dirent of directory) {
       const relativePath = relativeDirectory.length === 0
@@ -63,7 +81,8 @@ async function collectEntries(config: ResolvedConfig): Promise<{
       if (isExcluded(relativePath, config.uploadExcludes)) continue
 
       const localPath = posix.join(localDirectory, dirent.name)
-      if (dirent.isSymbolicLink()) {
+      const info = await lstat(localPath)
+      if (info.isSymbolicLink()) {
         if (config.symlinkPolicy === 'error') {
           throw new Error(`dsh-agentenv-sandbox: workspace contains symbolic link: ${relativePath}`)
         }
@@ -78,7 +97,7 @@ async function collectEntries(config: ResolvedConfig): Promise<{
         } catch {
           throw new Error(`dsh-agentenv-sandbox: workspace contains dangling symbolic link: ${relativePath}`)
         }
-        if (targetPath !== workspaceRoot && !targetPath.startsWith(`${workspaceRoot}/`)) {
+        if (!staysInWorkspace(targetPath)) {
           throw new Error(`dsh-agentenv-sandbox: symbolic link leaves workspace: ${relativePath}`)
         }
         const targetRelativePath = posix.relative(workspaceRoot, targetPath)
@@ -86,26 +105,28 @@ async function collectEntries(config: ResolvedConfig): Promise<{
           throw new Error(`dsh-agentenv-sandbox: symbolic link targets excluded path: ${relativePath}`)
         }
         const targetInfo = await lstat(targetPath)
+        if (targetInfo.isDirectory()) {
+          copiedSymlinks += 1
+          await visit(targetPath, relativePath, nextAncestors)
+          continue
+        }
         if (!targetInfo.isFile()) {
-          throw new Error(`dsh-agentenv-sandbox: symbolic link target is not a regular file: ${relativePath}`)
+          throw new Error(`dsh-agentenv-sandbox: symbolic link target is not a file or directory: ${relativePath}`)
         }
         addFile(targetPath, posix.join(config.cwd, relativePath), relativePath, targetInfo.size)
         copiedSymlinks += 1
         continue
       }
-      if (dirent.isDirectory()) {
-        await visit(localPath, relativePath)
+      if (info.isDirectory()) {
+        await visit(localPath, relativePath, nextAncestors)
         continue
       }
-      if (!dirent.isFile()) continue
-
-      const info = await lstat(localPath)
       if (!info.isFile()) continue
       addFile(localPath, posix.join(config.cwd, relativePath), relativePath, info.size)
     }
   }
 
-  await visit(config.localCwd, '')
+  await visit(config.localCwd, '', new Set())
   return { entries, bytes, copiedSymlinks, skippedSymlinks }
 }
 
