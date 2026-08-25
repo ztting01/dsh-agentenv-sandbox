@@ -39,8 +39,8 @@ export AENV_TEMPLATE_ID='<template-id-or-alias>'
 Download the release tarball and add it to a Harness profile:
 
 ```bash
-curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.3/dsh-agentenv-sandbox-0.1.3.tgz
-dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.3.tgz"
+curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.4/dsh-agentenv-sandbox-0.1.4.tgz
+dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.4.tgz"
 dsh --profile web --dump-config
 ```
 
@@ -82,7 +82,7 @@ Override the `agentenv-runtime` row in the profile's `cordis.patch.yml`. A later
 | `template` | `AENV_TEMPLATE_ID` | Required template id or alias |
 | `sandboxId` | omitted | Reconnect instead of create |
 | `cwd` | Harness `process.cwd()` | Shared absolute remote cwd |
-| `timeoutMs` | `3600000` | Requested sandbox lifetime |
+| `timeoutMs` | `3600000` | Rolling sandbox lease, renewed while Harness runs |
 | `secure` | `true` | Secure envd control traffic |
 | `onDispose` | `kill` | `kill` or AgentENV `pause` |
 | `uploadWorkspace` | `true` | Initial bounded host-to-sandbox upload |

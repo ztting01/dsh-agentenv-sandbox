@@ -34,19 +34,22 @@ function fakeSandbox(id = 'sandbox-1'): {
   makeDir: ReturnType<typeof vi.fn>
   getInfo: ReturnType<typeof vi.fn>
   run: ReturnType<typeof vi.fn>
+  renewTimeout: ReturnType<typeof vi.fn>
   kill: ReturnType<typeof vi.fn>
 } {
   const makeDir = vi.fn().mockResolvedValue(true)
   const getInfo = vi.fn().mockResolvedValue({ type: FileType.DIR })
   const run = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' })
+  const renewTimeout = vi.fn().mockResolvedValue(undefined)
   const kill = vi.fn().mockResolvedValue(undefined)
   const sandbox = {
     sandboxId: id,
     files: { makeDir, getInfo },
     commands: { run },
+    setTimeout: renewTimeout,
     kill,
   } as unknown as SandboxType
-  return { sandbox, makeDir, getInfo, run, kill }
+  return { sandbox, makeDir, getInfo, run, renewTimeout, kill }
 }
 
 beforeEach(() => {
@@ -131,6 +134,34 @@ describe('AgentEnvRuntime', () => {
       sandboxUrl: 'http://127.0.0.1:8000',
     })
     expect(fixture.kill).not.toHaveBeenCalled()
+  })
+
+  it('renews the sandbox lease while the runtime remains active', async () => {
+    vi.useFakeTimers()
+    try {
+      const fixture = fakeSandbox()
+      sdk.create.mockResolvedValue(fixture.sandbox)
+      const ctx = new Context()
+      const fiber = await ctx.plugin(AgentEnvRuntime, {
+        apiKey: 'test-key',
+        template: 'ubuntu-dev',
+        cwd: '/workspace',
+        localCwd: '/workspace',
+        timeoutMs: 1_000,
+        uploadWorkspace: false,
+      })
+      await ctx.e2b.getSandbox()
+
+      await vi.advanceTimersByTimeAsync(500)
+      expect(fixture.renewTimeout).toHaveBeenCalledWith(1_000)
+
+      await fiber.dispose()
+      fixture.renewTimeout.mockClear()
+      await vi.advanceTimersByTimeAsync(1_000)
+      expect(fixture.renewTimeout).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('kills the sandbox and withholds the service handle when setup fails', async () => {

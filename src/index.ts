@@ -65,18 +65,23 @@ export class AgentEnvRuntime extends Service {
 
   private readonly config: ResolvedConfig
   private readonly ready: Promise<Sandbox>
+  private readonly logger
   private disposed = false
+  private keepaliveTimer?: ReturnType<typeof setInterval>
+  private keepaliveInFlight = false
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'e2b')
     this.config = resolveConfig(config)
+    this.logger = ctx.logger('dsh-agentenv-sandbox')
     this.cwd = this.config.cwd
     this.runtimeRoot = posix.join(this.cwd, '.dsh-e2b')
     this.ready = this.open()
-    void this.ready.catch(() => {})
+    void this.ready.then(sandbox => this.startKeepalive(sandbox)).catch(() => {})
 
     ctx.effect(() => async () => {
       this.disposed = true
+      if (this.keepaliveTimer !== undefined) clearInterval(this.keepaliveTimer)
       let sandbox: Sandbox
       try {
         sandbox = await this.ready
@@ -108,6 +113,21 @@ export class AgentEnvRuntime extends Service {
       apiUrl: this.config.apiUrl,
       sandboxUrl: this.config.sandboxUrl,
     }
+  }
+
+  private startKeepalive(sandbox: Sandbox): void {
+    if (this.disposed) return
+    const intervalMs = Math.max(250, Math.min(300_000, Math.floor(this.config.timeoutMs / 2)))
+    this.keepaliveTimer = setInterval(() => {
+      if (this.disposed || this.keepaliveInFlight) return
+      this.keepaliveInFlight = true
+      void sandbox.setTimeout(this.config.timeoutMs).catch((error: unknown) => {
+        if (!this.disposed) this.logger.warn('AgentENV sandbox lease renewal failed: %o', error)
+      }).finally(() => {
+        this.keepaliveInFlight = false
+      })
+    }, intervalMs)
+    this.keepaliveTimer.unref?.()
   }
 
   private async open(): Promise<Sandbox> {
