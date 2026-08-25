@@ -21,7 +21,7 @@ describe('resolveConfig', () => {
       secure: true,
       onDispose: 'kill',
       uploadWorkspace: true,
-      symlinkPolicy: 'error',
+      symlinkPolicy: 'copy-internal',
     })
     expect(resolved.uploadExcludes).toContain('node_modules')
     expect(resolved.uploadExcludes).not.toContain('.git')

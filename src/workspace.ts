@@ -1,4 +1,4 @@
-import { lstat, opendir, readFile } from 'node:fs/promises'
+import { lstat, opendir, readFile, realpath } from 'node:fs/promises'
 import { posix } from 'node:path'
 import type { Sandbox } from 'e2b'
 import type { ResolvedConfig } from './config.js'
@@ -7,6 +7,7 @@ import type { ResolvedConfig } from './config.js'
 export interface UploadSummary {
   files: number
   bytes: number
+  copiedSymlinks: number
   skippedSymlinks: number
 }
 
@@ -30,11 +31,28 @@ function isExcluded(relativePath: string, excludes: readonly string[]): boolean 
 async function collectEntries(config: ResolvedConfig): Promise<{
   entries: UploadEntry[]
   bytes: number
+  copiedSymlinks: number
   skippedSymlinks: number
 }> {
   const entries: UploadEntry[] = []
   let bytes = 0
+  let copiedSymlinks = 0
   let skippedSymlinks = 0
+  const workspaceRoot = await realpath(config.localCwd)
+
+  function addFile(localPath: string, remotePath: string, relativePath: string, size: number): void {
+    if (size > config.uploadMaxFileBytes) {
+      throw new Error(`dsh-agentenv-sandbox: upload file exceeds limit: ${relativePath}`)
+    }
+    bytes += size
+    if (bytes > config.uploadMaxBytes) {
+      throw new Error('dsh-agentenv-sandbox: workspace upload exceeds aggregate byte limit')
+    }
+    entries.push({ localPath, remotePath, size })
+    if (entries.length > config.uploadMaxFiles) {
+      throw new Error('dsh-agentenv-sandbox: workspace upload exceeds file-count limit')
+    }
+  }
 
   async function visit(localDirectory: string, relativeDirectory: string): Promise<void> {
     const directory = await opendir(localDirectory)
@@ -49,7 +67,30 @@ async function collectEntries(config: ResolvedConfig): Promise<{
         if (config.symlinkPolicy === 'error') {
           throw new Error(`dsh-agentenv-sandbox: workspace contains symbolic link: ${relativePath}`)
         }
-        skippedSymlinks += 1
+        if (config.symlinkPolicy === 'skip') {
+          skippedSymlinks += 1
+          continue
+        }
+
+        let targetPath: string
+        try {
+          targetPath = await realpath(localPath)
+        } catch {
+          throw new Error(`dsh-agentenv-sandbox: workspace contains dangling symbolic link: ${relativePath}`)
+        }
+        if (targetPath !== workspaceRoot && !targetPath.startsWith(`${workspaceRoot}/`)) {
+          throw new Error(`dsh-agentenv-sandbox: symbolic link leaves workspace: ${relativePath}`)
+        }
+        const targetRelativePath = posix.relative(workspaceRoot, targetPath)
+        if (isExcluded(targetRelativePath, config.uploadExcludes)) {
+          throw new Error(`dsh-agentenv-sandbox: symbolic link targets excluded path: ${relativePath}`)
+        }
+        const targetInfo = await lstat(targetPath)
+        if (!targetInfo.isFile()) {
+          throw new Error(`dsh-agentenv-sandbox: symbolic link target is not a regular file: ${relativePath}`)
+        }
+        addFile(targetPath, posix.join(config.cwd, relativePath), relativePath, targetInfo.size)
+        copiedSymlinks += 1
         continue
       }
       if (dirent.isDirectory()) {
@@ -60,27 +101,12 @@ async function collectEntries(config: ResolvedConfig): Promise<{
 
       const info = await lstat(localPath)
       if (!info.isFile()) continue
-      const size = info.size
-      if (size > config.uploadMaxFileBytes) {
-        throw new Error(`dsh-agentenv-sandbox: upload file exceeds limit: ${relativePath}`)
-      }
-      bytes += size
-      if (bytes > config.uploadMaxBytes) {
-        throw new Error('dsh-agentenv-sandbox: workspace upload exceeds aggregate byte limit')
-      }
-      entries.push({
-        localPath,
-        remotePath: posix.join(config.cwd, relativePath),
-        size,
-      })
-      if (entries.length > config.uploadMaxFiles) {
-        throw new Error('dsh-agentenv-sandbox: workspace upload exceeds file-count limit')
-      }
+      addFile(localPath, posix.join(config.cwd, relativePath), relativePath, info.size)
     }
   }
 
   await visit(config.localCwd, '')
-  return { entries, bytes, skippedSymlinks }
+  return { entries, bytes, copiedSymlinks, skippedSymlinks }
 }
 
 /**
@@ -114,6 +140,7 @@ export async function uploadWorkspace(
   return {
     files: collected.entries.length,
     bytes: collected.bytes,
+    copiedSymlinks: collected.copiedSymlinks,
     skippedSymlinks: collected.skippedSymlinks,
   }
 }

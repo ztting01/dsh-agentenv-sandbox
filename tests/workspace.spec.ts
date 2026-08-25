@@ -40,7 +40,7 @@ describe('uploadWorkspace', () => {
     }, '/remote/project')
     const summary = await uploadWorkspace(mockSandbox(write), config)
 
-    expect(summary).toEqual({ files: 2, bytes: 44, skippedSymlinks: 0 })
+    expect(summary).toEqual({ files: 2, bytes: 44, copiedSymlinks: 0, skippedSymlinks: 0 })
     const uploaded = write.mock.calls.flatMap(call => call[0] as Array<{ path: string, data: ArrayBuffer }>)
     expect(uploaded.map(entry => entry.path).sort()).toEqual([
       '/remote/project/.git/HEAD',
@@ -63,7 +63,7 @@ describe('uploadWorkspace', () => {
     expect(write).not.toHaveBeenCalled()
   })
 
-  it('rejects symbolic links by default', async () => {
+  it('copies an internal regular-file symbolic link by default', async () => {
     const root = await fixtureRoot()
     await writeFile(posix.join(root, 'target.txt'), 'target')
     await symlink('target.txt', posix.join(root, 'link.txt'))
@@ -72,7 +72,43 @@ describe('uploadWorkspace', () => {
       E2B_API_KEY: 'test-key',
     }, '/remote/project')
 
+    await expect(uploadWorkspace(mockSandbox(write), config)).resolves.toEqual({
+      files: 2,
+      bytes: 12,
+      copiedSymlinks: 1,
+      skippedSymlinks: 0,
+    })
+    const uploaded = write.mock.calls.flatMap(call => call[0] as Array<{ path: string, data: ArrayBuffer }>)
+    const copied = uploaded.find(entry => entry.path === '/remote/project/link.txt')
+    expect(Buffer.from(copied!.data).toString()).toBe('target')
+  })
+
+  it('still supports fail-closed symbolic-link handling', async () => {
+    const root = await fixtureRoot()
+    await writeFile(posix.join(root, 'target.txt'), 'target')
+    await symlink('target.txt', posix.join(root, 'link.txt'))
+    const write = vi.fn().mockResolvedValue(undefined)
+    const config = resolveConfig({
+      template: 'ubuntu-dev',
+      localCwd: root,
+      symlinkPolicy: 'error',
+    }, { E2B_API_KEY: 'test-key' }, '/remote/project')
+
     await expect(uploadWorkspace(mockSandbox(write), config)).rejects.toThrow('symbolic link: link.txt')
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('rejects symbolic links that leave the workspace', async () => {
+    const root = await fixtureRoot()
+    const outside = await fixtureRoot()
+    await writeFile(posix.join(outside, 'secret.txt'), 'secret')
+    await symlink(posix.join(outside, 'secret.txt'), posix.join(root, 'link.txt'))
+    const write = vi.fn().mockResolvedValue(undefined)
+    const config = resolveConfig({ template: 'ubuntu-dev', localCwd: root }, {
+      E2B_API_KEY: 'test-key',
+    }, '/remote/project')
+
+    await expect(uploadWorkspace(mockSandbox(write), config)).rejects.toThrow('symbolic link leaves workspace: link.txt')
     expect(write).not.toHaveBeenCalled()
   })
 
@@ -90,6 +126,7 @@ describe('uploadWorkspace', () => {
     await expect(uploadWorkspace(mockSandbox(write), config)).resolves.toEqual({
       files: 1,
       bytes: 6,
+      copiedSymlinks: 0,
       skippedSymlinks: 1,
     })
   })

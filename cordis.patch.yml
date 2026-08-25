@@ -49,7 +49,7 @@
         secure: true
         onDispose: kill
         uploadWorkspace: true
-        symlinkPolicy: error
+        symlinkPolicy: copy-internal
 
     - id: subprocess-agentenv
       name: '@deepseek-ai/dsh-subprocess-e2b'

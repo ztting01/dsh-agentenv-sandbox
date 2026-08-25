@@ -53,7 +53,7 @@ export class AgentEnvRuntime extends Service {
     uploadMaxFiles: z.number(),
     uploadMaxBytes: z.number(),
     uploadMaxFileBytes: z.number(),
-    symlinkPolicy: z.union(['error', 'skip'] as const),
+    symlinkPolicy: z.union(['copy-internal', 'error', 'skip'] as const),
   })
 
   /** Remote directory used as the process and filesystem working directory. */

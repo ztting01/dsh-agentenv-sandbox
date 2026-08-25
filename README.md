@@ -39,8 +39,8 @@ export AENV_TEMPLATE_ID='<template-id-or-alias>'
 Download the release tarball and add it to a Harness profile:
 
 ```bash
-curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.1/dsh-agentenv-sandbox-0.1.1.tgz
-dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.1.tgz"
+curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.2/dsh-agentenv-sandbox-0.1.2.tgz
+dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.2.tgz"
 dsh --profile web --dump-config
 ```
 
@@ -66,7 +66,7 @@ cd /absolute/path/to/project
 dsh --profile web
 ```
 
-The default configuration uploads the project, including `.git`, to the same absolute POSIX path inside a fresh microVM. It excludes `node_modules`, Python virtual environments, caches, and `.dsh-agentenv`. Symbolic links abort startup by default so the remote workspace cannot silently differ from the host. Set `symlinkPolicy: skip` in a later profile patch only when omission is intentional.
+The default configuration uploads the project, including `.git`, to the same absolute POSIX path inside a fresh microVM. It excludes `node_modules`, Python virtual environments, caches, and `.dsh-agentenv`. A symbolic link to a regular file inside the workspace is uploaded as a regular-file copy. Links that are dangling, point outside the workspace, resolve to directories, or target excluded paths abort startup. Set `symlinkPolicy: error` for strict rejection or `skip` only when omission is intentional.
 
 ## Configuration
 
@@ -87,7 +87,7 @@ Override the `agentenv-runtime` row in the profile's `cordis.patch.yml`. A later
 | `uploadMaxFiles` | `50000` | Upload file-count bound |
 | `uploadMaxBytes` | `512 MiB` | Aggregate upload bound |
 | `uploadMaxFileBytes` | `64 MiB` | Per-file upload bound |
-| `symlinkPolicy` | `error` | Abort or skip symbolic links |
+| `symlinkPolicy` | `copy-internal` | Copy safe internal file links, or use `error`/`skip` |
 
 To preserve a sandbox across Harness restarts, set `onDispose: pause`, then start with the recorded `sandboxId`. Automatic discovery and host write-back are intentionally not part of this MVP.
 

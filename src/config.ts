@@ -4,7 +4,7 @@ import { posix } from 'node:path'
 export type DisposeAction = 'kill' | 'pause'
 
 /** Handling for symbolic links found during the initial workspace upload. */
-export type SymlinkPolicy = 'error' | 'skip'
+export type SymlinkPolicy = 'copy-internal' | 'error' | 'skip'
 
 /** User-facing AgentENV runtime configuration. */
 export interface Config {
@@ -38,7 +38,7 @@ export interface Config {
   uploadMaxBytes?: number
   /** Maximum bytes accepted for any one file. */
   uploadMaxFileBytes?: number
-  /** Whether a symbolic link aborts upload or is omitted. */
+  /** Whether an internal file link is copied, or any link aborts/is omitted. */
   symlinkPolicy?: SymlinkPolicy
 }
 
@@ -155,6 +155,6 @@ export function resolveConfig(
     uploadMaxFiles: requirePositiveInteger(config.uploadMaxFiles ?? 50_000, 'uploadMaxFiles'),
     uploadMaxBytes: requirePositiveInteger(config.uploadMaxBytes ?? 536_870_912, 'uploadMaxBytes'),
     uploadMaxFileBytes: requirePositiveInteger(config.uploadMaxFileBytes ?? 67_108_864, 'uploadMaxFileBytes'),
-    symlinkPolicy: config.symlinkPolicy ?? 'error',
+    symlinkPolicy: config.symlinkPolicy ?? 'copy-internal',
   }
 }
