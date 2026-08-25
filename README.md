@@ -22,7 +22,10 @@ The Harness process, model calls, Cordis services, session persistence, skills, 
 The included template provides Node.js 24, Bash, Git, ripgrep, Python, build tools, and the process utilities required by the official adapter:
 
 ```bash
-aenv build ./sandbox/Dockerfile --tag dsh-agentenv-node24 --cpu 2 --memory 4096
+aenv build ./sandbox/Dockerfile \
+  --tag dsh-agentenv-node24 \
+  --cpu 2 \
+  --memory 4096
 ```
 
 Set the connection values in the shell that starts Harness:
