@@ -15,7 +15,7 @@ The Harness process, model calls, Cordis services, session persistence, skills, 
 ## Prerequisites
 
 - WSL 2 or Linux with Node.js 22.19+ or 24+. Native Windows execution is not supported.
-- DeepSeek Harness `0.1.0-rc.7`, either installed as the `dsh` command or available as a source checkout.
+- DeepSeek Harness `0.1.0-rc.7`, installed and available as the `dsh` command.
 - AgentENV installed, authenticated, and running. This plugin does not install or start AgentENV.
 - An AgentENV template built before the first Harness launch. This plugin creates sandboxes from an existing template; it does not build the template automatically.
 
@@ -37,17 +37,11 @@ command -v aenv
 curl -f http://127.0.0.1:8000/health
 ```
 
-Confirm either that the installed Harness CLI is available:
+Confirm that the installed Harness CLI is available:
 
 ```bash
 command -v dsh
 dsh --version
-```
-
-or identify the Node.js binary and Harness source entry point you will use:
-
-```bash
-/path/to/node /path/to/deepseek-harness/apps/cli/lib/bin.js --version
 ```
 
 AgentENV authentication and server deployment are prerequisites supplied by AgentENV itself. Follow the AgentENV installation instructions for your platform before continuing. The plugin only connects to the resulting AgentENV API.
@@ -110,12 +104,6 @@ Download the release tarball and add it to a Harness profile:
 curl -LO https://github.com/ztting01/dsh-agentenv-sandbox/releases/download/v0.1.4/dsh-agentenv-sandbox-0.1.4.tgz
 dsh plugin --profile web add "$PWD/dsh-agentenv-sandbox-0.1.4.tgz"
 dsh --profile web --dump-config
-```
-
-If you run Harness from a source checkout instead of an installed `dsh` command, replace `dsh` with:
-
-```bash
-/path/to/node /path/to/deepseek-harness/apps/cli/lib/bin.js
 ```
 
 For plugin development, build once and install the local directory instead:
