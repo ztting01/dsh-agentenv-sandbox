@@ -17,7 +17,21 @@ function tomlString(text, key) {
 }
 
 async function loadCredentials() {
-  const text = await readFile(posix.join(homedir(), '.config/aenv/credentials'), 'utf8')
+  const apiUrl = process.env.E2B_API_URL?.trim()
+  const apiKey = (process.env.E2B_API_KEY ?? process.env.AENV_API_KEY)?.trim()
+  if (apiUrl && apiKey) {
+    return {
+      apiUrl: apiUrl.replace(/\/$/, ''),
+      apiKey,
+    }
+  }
+  if (apiUrl || apiKey) {
+    throw new Error('set both E2B_API_URL and E2B_API_KEY (or AENV_API_KEY) for the AgentENV smoke test')
+  }
+
+  const credentialsPath = process.env.AENV_CREDENTIALS_PATH?.trim()
+    || posix.join(homedir(), '.config/aenv/credentials')
+  const text = await readFile(credentialsPath, 'utf8')
   return {
     apiUrl: tomlString(text, 'url').replace(/\/$/, ''),
     apiKey: tomlString(text, 'api_key'),
